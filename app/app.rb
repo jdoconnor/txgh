@@ -12,10 +12,6 @@ module L10n
 
   class Application < Sinatra::Base
 
-    use Rack::Auth::Basic, 'Restricted Area' do |username, password|
-      username == 'foo' and password == 'bar'
-    end
-
     configure :development do
       register Sinatra::Reloader
     end
@@ -27,6 +23,9 @@ module L10n
     # This could implement the website for doing manual pushes,
     # check status of files on Transifex, etc...
 
+    get '/health_check' do
+      200
+    end
   end
 
   class Hooks < Sinatra::Base
@@ -47,18 +46,23 @@ module L10n
         transifex_project = Strava::L10n::TransifexProject.new(request['project'])
         tx_resource = transifex_project.resource(request['resource'])
 
+        if !tx_resource then
+          $stderr.puts "Resource " + request['resource'] + " not found!"
+          return
+        end
+
         # Do not update the source
         unless request['language'] == tx_resource.source_lang
           translation = transifex_project.api.download(tx_resource, request['language'])
           translation_path = tx_resource.translation_path(transifex_project.lang_map(request['language']))
-          transifex_project.github_repo.api.commit(
-              transifex_project.github_repo.name, translation_path, translation)
+          repo = tx_resource.repo || transifex_project.github_repo
+          repo.api.commit(repo.name, translation_path, translation)
         end
       end
     end
 
     post '/github' do
-      hook_data = JSON.parse(params[:payload], symbolize_names: true)
+      hook_data = JSON.parse(request.body.read, symbolize_names: true)
       # We only care about the master branch
       if hook_data[:ref] == 'refs/heads/master'
         github_repo_name = "#{hook_data[:repository][:owner][:name]}/#{hook_data[:repository][:name]}"

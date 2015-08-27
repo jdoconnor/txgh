@@ -2,6 +2,8 @@ $:.unshift File::dirname(__FILE__)
 $:.unshift "#{File::dirname(__FILE__)}/lib"
 
 require './app/app'
+require 'dotenv'
+Dotenv.load
 
 map '/' do
   use L10n::Application
