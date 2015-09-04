@@ -63,3 +63,4 @@ type = <FILETYPE>
 
 ```
 
+docker test
